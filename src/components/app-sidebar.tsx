@@ -16,6 +16,7 @@ import {
   Settings,
   ChevronRight,
   Megaphone,
+  Rocket,
 } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
@@ -81,9 +82,10 @@ const navSections: { label: string; items: NavItem[] }[] = [
   {
     label: "Marketing",
     items: [
-      { title: "Blog",    url: "/dashboard/blog",   icon: FileText     },
-      { title: "Banners",          url: "/dashboard/banner",           icon: ImagePlay    },
-      { title: "Announcement Bar", url: "/dashboard/announcement-bar", icon: Megaphone   },
+      { title: "Blog",             url: "/dashboard/blog",             icon: FileText      },
+      { title: "Banners",          url: "/dashboard/banner",           icon: ImagePlay     },
+      { title: "Announcement Bar", url: "/dashboard/announcement-bar", icon: Megaphone    },
+      { title: "Campaigns",        url: "/dashboard/campaigns",        icon: Rocket        },
       { title: "Offers",           url: "/dashboard/offer",            icon: TicketPercent },
     ],
   },

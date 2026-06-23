@@ -22,7 +22,7 @@ export interface ShippingAddressType {
 export interface OrderType {
   id: string;
   orderNumber: string;
-  userId: string;
+  userId: string | null;
   status: "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "REFUNDED";
   subtotal: number;
   shippingCharge: number;
@@ -33,6 +33,9 @@ export interface OrderType {
   shippingAddressId: string | null;
   shippingAddress: ShippingAddressType | null;
   user: { id: string; name: string | null; email: string } | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  recipientAddress: string | null;
   items: OrderItemType[];
   paidAt: string | null;
   deliveredAt: string | null;
