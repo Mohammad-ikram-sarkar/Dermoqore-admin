@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Loader2Icon, ArrowLeftIcon, ChevronDownIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OrderService, type OrderType } from "@/service/order.service"
+import { CampaignService, type CampaignOrder, type CampaignOrderStatus } from "@/service/campaign.service"
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   PENDING:    { label: "Pending",    color: "bg-amber-100 text-amber-700" },
@@ -17,13 +18,17 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 const STATUS_OPTIONS = ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"]
+const CAMPAIGN_STATUS_OPTIONS = STATUS_OPTIONS.filter((s) => s !== "REFUNDED")
 
 export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const isCampaign = searchParams.get("type") === "campaign"
 
   const [order, setOrder] = useState<OrderType | null>(null)
+  const [campOrder, setCampOrder] = useState<CampaignOrder | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,26 +38,33 @@ export default function OrderDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await OrderService.findOne(id)
-      setOrder(data)
+      if (isCampaign) {
+        const data = await CampaignService.getOrderById(id)
+        setCampOrder(data)
+      } else {
+        const data = await OrderService.findOne(id)
+        setOrder(data)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load order")
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, isCampaign])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
   const handleStatusChange = async (newStatus: string) => {
-    if (!order) return
     setSaving(true)
     setError(null)
     try {
-      const updated = await OrderService.updateStatus(order.id, newStatus)
-      setOrder(updated)
+      if (isCampaign && campOrder) {
+        const updated = await CampaignService.updateOrderStatus(campOrder.id, newStatus as CampaignOrderStatus)
+        setCampOrder(updated)
+      } else if (order) {
+        const updated = await OrderService.updateStatus(order.id, newStatus)
+        setOrder(updated)
+      }
       setStatusOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update status")
@@ -72,25 +84,143 @@ export default function OrderDetailPage() {
     )
   }
 
-  if (error && !order) {
+  if (error && !order && !campOrder) {
     return (
       <div className="space-y-4 p-1">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeftIcon className="size-3.5" />
-          Back
+          <ArrowLeftIcon className="size-3.5" /> Back
         </Button>
         <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
       </div>
     )
   }
 
-  if (!order) return null
+  // ── Campaign order detail ──────────────────────────────────────
+  if (isCampaign && campOrder) {
+    const s = STATUS_LABELS[campOrder.status] ?? STATUS_LABELS.PENDING
+    return (
+      <div className="space-y-6 p-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon-xs" onClick={() => router.push("/dashboard/orders?tab=campaign")}>
+              <ArrowLeftIcon className="size-3.5" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-mono text-sm font-semibold tracking-wide">{campOrder.orderNumber}</h1>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${s.color}`}>{s.label}</span>
+                <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-700 px-2.5 py-0.5 text-xs font-medium">Campaign</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Placed on {new Date(campOrder.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+              </p>
+            </div>
+          </div>
+          <div className="relative">
+            <Button variant="outline" size="sm" disabled={saving} onClick={() => setStatusOpen(!statusOpen)}>
+              {saving && <Loader2Icon className="size-3.5 animate-spin" />}
+              <span>Update Status</span>
+              <ChevronDownIcon className="size-3.5" />
+            </Button>
+            {statusOpen && (
+              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded border border-border bg-background shadow-lg">
+                {CAMPAIGN_STATUS_OPTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => handleStatusChange(s)}
+                    className={`flex w-full items-center px-3 py-2 text-left text-xs font-medium uppercase tracking-wider hover:bg-muted transition-colors ${campOrder.status === s ? "bg-muted" : ""}`}
+                  >
+                    {STATUS_LABELS[s]?.label ?? s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
+        {error && (
+          <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        )}
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            {/* Customer */}
+            <div className="rounded border border-border">
+              <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Customer</h2>
+              </div>
+              <div className="p-4 text-sm space-y-1">
+                <p className="font-medium">{campOrder.customerName}</p>
+                <p className="text-muted-foreground">{campOrder.customerPhone}</p>
+              </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div className="rounded border border-border">
+              <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Address</h2>
+              </div>
+              <div className="p-4 text-sm space-y-1">
+                <p className="text-muted-foreground">{campOrder.customerAddress}</p>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${campOrder.deliveryZone === "INSIDE_DHAKA" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                  {campOrder.deliveryZone === "INSIDE_DHAKA" ? "Inside Dhaka" : "Outside Dhaka"}
+                </span>
+              </div>
+            </div>
+
+            {campOrder.notes && (
+              <div className="rounded border border-border">
+                <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notes</h2>
+                </div>
+                <div className="p-4 text-sm text-muted-foreground">{campOrder.notes}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Summary */}
+          <div className="space-y-4">
+            <div className="rounded border border-border">
+              <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Summary</h2>
+              </div>
+              <div className="p-4 text-sm space-y-2">
+                {campOrder.campaign && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Campaign</span>
+                    <span className="text-right max-w-[140px] truncate">{campOrder.campaign.title}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Unit Price</span>
+                  <span>৳{Number(campOrder.unitPrice).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Quantity</span>
+                  <span>{campOrder.quantity}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span>৳{Number(campOrder.shippingCharge).toLocaleString()}</span>
+                </div>
+                <div className="border-t border-border pt-2 flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span>৳{Number(campOrder.total).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Website order detail ───────────────────────────────────────
+  if (!order) return null
   const status = STATUS_LABELS[order.status] ?? STATUS_LABELS.PENDING
 
   return (
     <div className="space-y-6 p-1">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon-xs" onClick={() => router.push("/dashboard/orders")}>
@@ -98,20 +228,14 @@ export default function OrderDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-wide font-mono text-sm">{order.orderNumber}</h1>
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${status.color}`}>
-                {status.label}
-              </span>
+              <h1 className="font-mono text-sm font-semibold tracking-wide">{order.orderNumber}</h1>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${status.color}`}>{status.label}</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Placed on {new Date(order.createdAt).toLocaleDateString("en-US", {
-                weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
-              })}
+              Placed on {new Date(order.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>
         </div>
-
-        {/* Status dropdown */}
         <div className="relative">
           <Button variant="outline" size="sm" disabled={saving} onClick={() => setStatusOpen(!statusOpen)}>
             {saving && <Loader2Icon className="size-3.5 animate-spin" />}
@@ -124,9 +248,7 @@ export default function OrderDetailPage() {
                 <button
                   key={s}
                   onClick={() => handleStatusChange(s)}
-                  className={`flex w-full items-center px-3 py-2 text-left text-xs font-medium uppercase tracking-wider hover:bg-muted transition-colors ${
-                    order.status === s ? "bg-muted" : ""
-                  }`}
+                  className={`flex w-full items-center px-3 py-2 text-left text-xs font-medium uppercase tracking-wider hover:bg-muted transition-colors ${order.status === s ? "bg-muted" : ""}`}
                 >
                   {STATUS_LABELS[s]?.label ?? s}
                 </button>
@@ -141,20 +263,18 @@ export default function OrderDetailPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-
-        {/* Customer & Shipping */}
         <div className="space-y-4 lg:col-span-2">
           <div className="rounded border border-border">
             <div className="border-b border-border bg-muted/20 px-4 py-2.5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Customer</h2>
             </div>
             <div className="p-4 text-sm space-y-1">
-              <p className="font-medium">{order.user?.name ?? "N/A"}</p>
-              <p className="text-muted-foreground">{order.user?.email}</p>
+              <p className="font-medium">{order.user?.name ?? order.recipientName ?? "N/A"}</p>
+              <p className="text-muted-foreground">{order.user?.email ?? order.recipientPhone ?? "—"}</p>
             </div>
           </div>
 
-          {order.shippingAddress && (
+          {order.shippingAddress ? (
             <div className="rounded border border-border">
               <div className="border-b border-border bg-muted/20 px-4 py-2.5">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shipping Address</h2>
@@ -163,23 +283,28 @@ export default function OrderDetailPage() {
                 <p className="font-medium">{order.shippingAddress.name}</p>
                 <p className="text-muted-foreground">{order.shippingAddress.phone}</p>
                 <p className="text-muted-foreground">{order.shippingAddress.address}</p>
-                {order.shippingAddress.area && (
-                  <p className="text-muted-foreground">{order.shippingAddress.area}</p>
-                )}
+                {order.shippingAddress.area && <p className="text-muted-foreground">{order.shippingAddress.area}</p>}
                 <p className="text-muted-foreground">{order.shippingAddress.city}</p>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${
-                  order.shippingAddress.zone === "INSIDE_DHAKA"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-orange-100 text-orange-700"
-                }`}>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${order.shippingAddress.zone === "INSIDE_DHAKA" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
                   {order.shippingAddress.zone === "INSIDE_DHAKA" ? "Inside Dhaka" : "Outside Dhaka"}
                 </span>
               </div>
             </div>
-          )}
+          ) : order.recipientAddress ? (
+            <div className="rounded border border-border">
+              <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Address</h2>
+              </div>
+              <div className="p-4 text-sm space-y-0.5">
+                <p className="text-muted-foreground">{order.recipientAddress}</p>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${order.deliveryZone === "INSIDE_DHAKA" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                  {order.deliveryZone === "INSIDE_DHAKA" ? "Inside Dhaka" : "Outside Dhaka"}
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {/* Order Summary */}
         <div className="space-y-4">
           <div className="rounded border border-border">
             <div className="border-b border-border bg-muted/20 px-4 py-2.5">
@@ -204,21 +329,6 @@ export default function OrderDetailPage() {
                 <span>Total</span>
                 <span>৳{Number(order.total).toLocaleString("en-BD")}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded border border-border">
-            <div className="border-b border-border bg-muted/20 px-4 py-2.5">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Zone</h2>
-            </div>
-            <div className="p-4">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                order.deliveryZone === "INSIDE_DHAKA"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-orange-100 text-orange-700"
-              }`}>
-                {order.deliveryZone === "INSIDE_DHAKA" ? "Inside Dhaka" : "Outside Dhaka"}
-              </span>
             </div>
           </div>
 
@@ -254,19 +364,13 @@ export default function OrderDetailPage() {
               <tr key={item.id} className="transition-colors hover:bg-muted/50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {item.image && (
-                      <img src={item.image} alt="" className="size-10 rounded object-cover bg-muted" />
-                    )}
+                    {item.image && <img src={item.image} alt="" className="size-10 rounded object-cover bg-muted" />}
                     <span className="font-medium">{item.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  ৳{Number(item.unitPrice).toLocaleString("en-BD")}
-                </td>
+                <td className="px-4 py-3 text-muted-foreground">৳{Number(item.unitPrice).toLocaleString("en-BD")}</td>
                 <td className="px-4 py-3 text-muted-foreground">{item.quantity}</td>
-                <td className="px-4 py-3 text-right text-muted-foreground font-medium">
-                  ৳{Number(item.totalPrice).toLocaleString("en-BD")}
-                </td>
+                <td className="px-4 py-3 text-right text-muted-foreground font-medium">৳{Number(item.totalPrice).toLocaleString("en-BD")}</td>
               </tr>
             ))}
           </tbody>

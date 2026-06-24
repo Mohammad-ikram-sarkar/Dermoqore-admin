@@ -128,9 +128,17 @@ export const CampaignService = {
     return data as any;
   },
 
-  getAllOrders: async (page = 1): Promise<{ items: CampaignOrder[]; meta: { page: number; limit: number; total: number; totalPages: number } }> => {
-    const { data } = await api.get(`/api/campaign/admin/orders?page=${page}`);
+  getAllOrders: async (page = 1, status?: string, phone?: string): Promise<{ items: CampaignOrder[]; meta: { page: number; limit: number; total: number; totalPages: number } }> => {
+    const params = new URLSearchParams({ page: String(page) })
+    if (status) params.set('status', status)
+    if (phone) params.set('phone', phone)
+    const { data } = await api.get(`/api/campaign/admin/orders?${params}`);
     return data as any;
+  },
+
+  getOrderById: async (orderId: string): Promise<CampaignOrder> => {
+    const { data } = await api.get<CampaignOrder>(`/api/campaign/admin/orders/${orderId}`);
+    return data;
   },
 
   updateOrderStatus: async (orderId: string, status: CampaignOrderStatus): Promise<CampaignOrder> => {
