@@ -14,6 +14,7 @@ import {
   type Testimonial,
   type Feature,
   type Ingredient,
+  type FaqItem,
   type CreateCampaignPayload,
 } from "@/service/campaign.service"
 
@@ -97,6 +98,11 @@ export default function CampaignForm({ initial, products, mode }: Props) {
     initial?.ingredients ?? [{ name: "", image: "", description: "" }]
   )
 
+  /* ── New: FAQs ── */
+  const [faqs, setFaqs] = useState<FaqItem[]>(
+    initial?.faqs ?? [{ question: "", answer: "" }]
+  )
+
   const [heroImages, setHeroImages] = useState<{ url: string; alt: string; sortOrder: number }[]>(
     initial?.heroImages?.map((img) => ({ url: img.url, alt: img.alt ?? "", sortOrder: img.sortOrder })) ?? []
   )
@@ -161,6 +167,12 @@ export default function CampaignForm({ initial, products, mode }: Props) {
     }
   }, [])
 
+  /* ── FAQ helpers ── */
+  const addFaq = () => setFaqs((p) => [...p, { question: "", answer: "" }])
+  const removeFaq = (i: number) => setFaqs((p) => p.filter((_, idx) => idx !== i))
+  const updateFaq = (i: number, field: keyof FaqItem, v: string) =>
+    setFaqs((p) => p.map((faq, idx) => (idx === i ? { ...faq, [field]: v } : faq)))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
@@ -181,6 +193,7 @@ export default function CampaignForm({ initial, products, mode }: Props) {
       included: included.filter(Boolean),
       features: features.filter((f) => f.title),
       ingredients: ingredients.filter((ig) => ig.name && ig.image),
+      faqs: faqs.filter((faq) => faq.question && faq.answer).map((faq, i) => ({ ...faq, sortOrder: i })),
       theme,
       offerBadge: offerBadge || undefined,
       ctaText: ctaText || undefined,
@@ -461,6 +474,42 @@ export default function CampaignForm({ initial, products, mode }: Props) {
                 </div>
               </div>
               <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeIngredient(i)}>
+                <TrashIcon className="size-3.5 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ── FAQ Section ──────────────────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">FAQ</h2>
+            <p className="text-xs text-muted-foreground mt-1">Frequently asked questions shown in the accordion on the campaign page.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addFaq}>
+            <PlusIcon className="size-3.5" /> Add FAQ
+          </Button>
+        </div>
+        {faqs.map((faq, i) => (
+          <div key={i} className="rounded border border-border p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 space-y-2">
+                <Input
+                  value={faq.question}
+                  onChange={(e) => updateFaq(i, "question", e.target.value)}
+                  placeholder={`Question ${i + 1}`}
+                />
+                <textarea
+                  value={faq.answer}
+                  onChange={(e) => updateFaq(i, "answer", e.target.value)}
+                  placeholder="Answer..."
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeFaq(i)}>
                 <TrashIcon className="size-3.5 text-destructive" />
               </Button>
             </div>

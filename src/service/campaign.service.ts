@@ -8,6 +8,7 @@ export type WhySection = { heading: string; items: string[] };
 export type Testimonial = { name: string; location?: string; text: string };
 export type Feature = { title: string; description: string; icon: string };
 export type Ingredient = { name: string; image: string; description: string };
+export type FaqItem = { id?: string; question: string; answer: string; sortOrder?: number };
 
 export interface CampaignImage {
   id: string;
@@ -41,6 +42,7 @@ export interface Campaign {
   included?: string[];
   features?: Feature[];
   ingredients?: Ingredient[];
+  faqs?: FaqItem[];
   theme: CampaignTheme;
   offerBadge?: string;
   ctaText?: string;
@@ -85,6 +87,7 @@ export type CreateCampaignPayload = {
   included?: string[];
   features?: Feature[];
   ingredients?: Ingredient[];
+  faqs?: FaqItem[];
   theme?: CampaignTheme;
   offerBadge?: string;
   ctaText?: string;
