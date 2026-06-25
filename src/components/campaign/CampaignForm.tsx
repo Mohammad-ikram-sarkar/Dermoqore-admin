@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label"
 import {
   CampaignService,
   type Campaign,
+  type CampaignTheme,
   type WhySection,
   type Testimonial,
+  type Feature,
+  type Ingredient,
   type CreateCampaignPayload,
 } from "@/service/campaign.service"
 
@@ -28,6 +31,29 @@ function slugify(str: string) {
 
 const selectCls =
   "h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+
+/* ── Icon keyword options (shared with client Features component) ─────── */
+const ICON_OPTIONS: { keyword: string; label: string }[] = [
+  { keyword: "spot", label: "Spot Reduction" },
+  { keyword: "radiance", label: "Radiance / Brightness" },
+  { keyword: "moisture", label: "Moisturize" },
+  { keyword: "shield", label: "Protection / Shield" },
+  { keyword: "leaf", label: "Natural / Herbal" },
+  { keyword: "glow", label: "Glow" },
+  { keyword: "sun", label: "Sun Care" },
+  { keyword: "heart", label: "Self-Care / Love" },
+  { keyword: "droplets", label: "Hydration" },
+  { keyword: "sparkle", label: "Sparkle / Premium" },
+]
+
+/* ── Theme preset options ─────────────────────────────────────────────── */
+const THEME_OPTIONS: { value: CampaignTheme; label: string; swatch: string }[] = [
+  { value: "DEFAULT", label: "Default (Neutral)", swatch: "#171717" },
+  { value: "EMERALD", label: "Emerald (Green)", swatch: "#059669" },
+  { value: "ROSE", label: "Rose (Pink)", swatch: "#e11d48" },
+  { value: "OCEAN", label: "Ocean (Blue)", swatch: "#0284c7" },
+  { value: "AMBER", label: "Amber (Orange)", swatch: "#d97706" },
+]
 
 export default function CampaignForm({ initial, products, mode }: Props) {
   const router = useRouter()
@@ -56,6 +82,19 @@ export default function CampaignForm({ initial, products, mode }: Props) {
   const [included, setIncluded] = useState<string[]>(initial?.included ?? [""])
   const [testimonials, setTestimonials] = useState<Testimonial[]>(
     initial?.testimonials ?? [{ name: "", location: "", text: "" }]
+  )
+
+  /* ── New: Theme ── */
+  const [theme, setTheme] = useState<CampaignTheme>(initial?.theme ?? "DEFAULT")
+
+  /* ── New: Features ── */
+  const [features, setFeatures] = useState<Feature[]>(
+    initial?.features ?? [{ title: "", description: "", icon: "glow" }]
+  )
+
+  /* ── New: Ingredients ── */
+  const [ingredients, setIngredients] = useState<Ingredient[]>(
+    initial?.ingredients ?? [{ name: "", image: "", description: "" }]
   )
 
   const [heroImages, setHeroImages] = useState<{ url: string; alt: string; sortOrder: number }[]>(
@@ -98,6 +137,30 @@ export default function CampaignForm({ initial, products, mode }: Props) {
       p.map((s, idx) => (idx === si ? { ...s, items: s.items.map((item, i) => (i === ii ? v : item)) } : s))
     )
 
+  /* ── Features helpers ── */
+  const addFeature = () => setFeatures((p) => [...p, { title: "", description: "", icon: "glow" }])
+  const removeFeature = (i: number) => setFeatures((p) => p.filter((_, idx) => idx !== i))
+  const updateFeature = (i: number, field: keyof Feature, v: string) =>
+    setFeatures((p) => p.map((f, idx) => (idx === i ? { ...f, [field]: v } : f)))
+
+  /* ── Ingredients helpers ── */
+  const [uploadingIngredient, setUploadingIngredient] = useState(false)
+  const addIngredient = () => setIngredients((p) => [...p, { name: "", image: "", description: "" }])
+  const removeIngredient = (i: number) => setIngredients((p) => p.filter((_, idx) => idx !== i))
+  const updateIngredient = (i: number, field: keyof Ingredient, v: string) =>
+    setIngredients((p) => p.map((ig, idx) => (idx === i ? { ...ig, [field]: v } : ig)))
+  const handleIngredientImageUpload = useCallback(async (index: number, file: File) => {
+    setUploadingIngredient(true)
+    try {
+      const { url } = await CampaignService.uploadImage(file)
+      updateIngredient(index, "image", url)
+    } catch {
+      setError("Ingredient image upload failed")
+    } finally {
+      setUploadingIngredient(false)
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
@@ -116,6 +179,9 @@ export default function CampaignForm({ initial, products, mode }: Props) {
       benefits: benefits.filter(Boolean),
       testimonials: testimonials.filter((t) => t.name || t.text),
       included: included.filter(Boolean),
+      features: features.filter((f) => f.title),
+      ingredients: ingredients.filter((ig) => ig.name && ig.image),
+      theme,
       offerBadge: offerBadge || undefined,
       ctaText: ctaText || undefined,
       phoneNumber: phoneNumber || undefined,
@@ -191,6 +257,33 @@ export default function CampaignForm({ initial, products, mode }: Props) {
               <option value="ENDED">Ended</option>
             </select>
           </div>
+        </div>
+      </section>
+
+      {/* ── Theme ─────────────────────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Theme</h2>
+        <p className="text-xs text-muted-foreground">Choose the color palette for the campaign landing page.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {THEME_OPTIONS.map((t) => {
+            const active = theme === t.value
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTheme(t.value)}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all ${
+                  active ? "border-foreground bg-muted/40 shadow-sm" : "border-border hover:border-foreground/30"
+                }`}
+              >
+                <div
+                  className={`size-8 rounded-full ring-2 ring-offset-2 ring-offset-card ${active ? "" : "ring-transparent"}`}
+                  style={{ background: t.swatch }}
+                />
+                <span className="text-xs font-medium">{t.label}</span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -270,6 +363,109 @@ export default function CampaignForm({ initial, products, mode }: Props) {
             <Input id="formTitle" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="এখনই অর্ডার করুন" />
           </div>
         </div>
+      </section>
+
+      {/* ── Features (icon cards) ─────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Feature Cards</h2>
+            <p className="text-xs text-muted-foreground mt-1">Icon cards displayed on the campaign landing page (e.g. Reduces Spots, Boosts Radiance).</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addFeature}>
+            <PlusIcon className="size-3.5" /> Add Feature
+          </Button>
+        </div>
+        {features.map((f, i) => (
+          <div key={i} className="rounded border border-border p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="grid gap-3 sm:grid-cols-3 flex-1">
+                <Input
+                  value={f.title}
+                  onChange={(e) => updateFeature(i, "title", e.target.value)}
+                  placeholder="Feature title (e.g. Reduces Spots)"
+                />
+                <select
+                  value={f.icon}
+                  onChange={(e) => updateFeature(i, "icon", e.target.value)}
+                  className={selectCls}
+                >
+                  {ICON_OPTIONS.map((opt) => (
+                    <option key={opt.keyword} value={opt.keyword}>{opt.label}</option>
+                  ))}
+                </select>
+                <Input
+                  value={f.description}
+                  onChange={(e) => updateFeature(i, "description", e.target.value)}
+                  placeholder="Short description"
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeFeature(i)}>
+                <TrashIcon className="size-3.5 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ── Ingredients ────────────────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Ingredients</h2>
+            <p className="text-xs text-muted-foreground mt-1">Ingredient cards with images shown on the campaign page.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addIngredient}>
+            <PlusIcon className="size-3.5" /> Add Ingredient
+          </Button>
+        </div>
+        {ingredients.map((ig, i) => (
+          <div key={i} className="rounded border border-border p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr] flex-1">
+                <Input
+                  value={ig.name}
+                  onChange={(e) => updateIngredient(i, "name", e.target.value)}
+                  placeholder="Ingredient name (e.g. Aloe Vera)"
+                />
+                <Input
+                  value={ig.description}
+                  onChange={(e) => updateIngredient(i, "description", e.target.value)}
+                  placeholder="Short description"
+                />
+                <div className="sm:col-span-2 flex items-center gap-3">
+                  {ig.image && (
+                    <img src={ig.image} alt={ig.name || "Ingredient"} className="size-12 rounded-lg object-cover border border-border" />
+                  )}
+                  <label className="flex h-12 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-4 text-muted-foreground hover:border-foreground/40 transition-colors">
+                    {uploadingIngredient ? <Loader2Icon className="size-4 animate-spin" /> : <UploadIcon className="size-4" />}
+                    <span className="ml-2 text-xs">{ig.image ? "Change" : "Upload Image"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => e.target.files?.[0] && handleIngredientImageUpload(i, e.target.files[0])}
+                    />
+                  </label>
+                  {!ig.image && (
+                    <span className="text-xs text-muted-foreground">or paste URL:</span>
+                  )}
+                  {!ig.image && (
+                    <Input
+                      value={ig.image}
+                      onChange={(e) => updateIngredient(i, "image", e.target.value)}
+                      placeholder="https://res.cloudinary.com/..."
+                      className="flex-1"
+                    />
+                  )}
+                </div>
+              </div>
+              <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeIngredient(i)}>
+                <TrashIcon className="size-3.5 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
       </section>
 
       {/* ── Why Sections ─────────────────────────────────────────────── */}

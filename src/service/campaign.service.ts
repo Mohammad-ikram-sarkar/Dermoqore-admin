@@ -2,9 +2,12 @@ import { api } from "@/lib/api";
 
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "ENDED";
 export type CampaignOrderStatus = "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+export type CampaignTheme = "DEFAULT" | "EMERALD" | "ROSE" | "OCEAN" | "AMBER";
 
 export type WhySection = { heading: string; items: string[] };
 export type Testimonial = { name: string; location?: string; text: string };
+export type Feature = { title: string; description: string; icon: string };
+export type Ingredient = { name: string; image: string; description: string };
 
 export interface CampaignImage {
   id: string;
@@ -36,6 +39,9 @@ export interface Campaign {
   benefits?: string[];
   testimonials?: Testimonial[];
   included?: string[];
+  features?: Feature[];
+  ingredients?: Ingredient[];
+  theme: CampaignTheme;
   offerBadge?: string;
   ctaText?: string;
   phoneNumber?: string;
@@ -77,6 +83,9 @@ export type CreateCampaignPayload = {
   benefits?: string[];
   testimonials?: Testimonial[];
   included?: string[];
+  features?: Feature[];
+  ingredients?: Ingredient[];
+  theme?: CampaignTheme;
   offerBadge?: string;
   ctaText?: string;
   phoneNumber?: string;
