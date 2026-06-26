@@ -12,6 +12,7 @@ import {
   type CampaignTheme,
   type WhySection,
   type Testimonial,
+  type CustomerReview,
   type Feature,
   type Ingredient,
   type FaqItem,
@@ -67,6 +68,8 @@ export default function CampaignForm({ initial, products, mode }: Props) {
 
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl ?? "")
   const [videoTitle, setVideoTitle] = useState(initial?.videoTitle ?? "")
+  const [productVideoUrl, setProductVideoUrl] = useState(initial?.productVideoUrl ?? "")
+  const [productVideoTitle, setProductVideoTitle] = useState(initial?.productVideoTitle ?? "")
 
   const [campaignPrice, setCampaignPrice] = useState(String(initial?.campaignPrice ?? ""))
   const [comparePrice, setComparePrice] = useState(String(initial?.comparePrice ?? ""))
@@ -83,6 +86,9 @@ export default function CampaignForm({ initial, products, mode }: Props) {
   const [included, setIncluded] = useState<string[]>(initial?.included ?? [""])
   const [testimonials, setTestimonials] = useState<Testimonial[]>(
     initial?.testimonials ?? [{ name: "", location: "", text: "" }]
+  )
+  const [customerReviews, setCustomerReviews] = useState<CustomerReview[]>(
+    initial?.customerReviews ?? [{ name: "", title: "", videoTitle: "", videoDescription: "", videoUrl: "" }]
   )
 
   /* ── New: Theme ── */
@@ -102,6 +108,14 @@ export default function CampaignForm({ initial, products, mode }: Props) {
   const [faqs, setFaqs] = useState<FaqItem[]>(
     initial?.faqs ?? [{ question: "", answer: "" }]
   )
+
+  /* ── New: Lab Report ── */
+  const [labReportTitle, setLabReportTitle] = useState(initial?.labReportTitle ?? "BTRI Lab Test Report")
+  const [labReportDescription, setLabReportDescription] = useState(initial?.labReportDescription ?? "")
+  const [labReportButtonText, setLabReportButtonText] = useState(initial?.labReportButtonText ?? "সম্পূর্ণ রিপোর্ট দেখুন")
+  const [labReportButtonUrl, setLabReportButtonUrl] = useState(initial?.labReportButtonUrl ?? "")
+  const [labReportImages, setLabReportImages] = useState<string[]>(initial?.labReportImages ?? [])
+  const [uploadingLabImage, setUploadingLabImage] = useState(false)
 
   const [heroImages, setHeroImages] = useState<{ url: string; alt: string; sortOrder: number }[]>(
     initial?.heroImages?.map((img) => ({ url: img.url, alt: img.alt ?? "", sortOrder: img.sortOrder })) ?? []
@@ -173,6 +187,25 @@ export default function CampaignForm({ initial, products, mode }: Props) {
   const updateFaq = (i: number, field: keyof FaqItem, v: string) =>
     setFaqs((p) => p.map((faq, idx) => (idx === i ? { ...faq, [field]: v } : faq)))
 
+  /* ── Customer Review helpers ── */
+  const addCustomerReview = () => setCustomerReviews((p) => [...p, { name: "", title: "", videoTitle: "", videoDescription: "", videoUrl: "" }])
+  const removeCustomerReview = (i: number) => setCustomerReviews((p) => p.filter((_, idx) => idx !== i))
+  const updateCustomerReview = (i: number, field: keyof CustomerReview, v: string) =>
+    setCustomerReviews((p) => p.map((r, idx) => (idx === i ? { ...r, [field]: v } : r)))
+
+  /* ── Lab Report helpers ── */
+  const handleLabImageUpload = useCallback(async (file: File) => {
+    setUploadingLabImage(true)
+    try {
+      const { url } = await CampaignService.uploadImage(file)
+      setLabReportImages((prev) => [...prev.slice(0, 2), url])
+    } catch {
+      setError("Lab report image upload failed")
+    } finally {
+      setUploadingLabImage(false)
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
@@ -185,16 +218,24 @@ export default function CampaignForm({ initial, products, mode }: Props) {
       productId,
       videoUrl: videoUrl || undefined,
       videoTitle: videoTitle || undefined,
+      productVideoUrl: productVideoUrl || undefined,
+      productVideoTitle: productVideoTitle || undefined,
       campaignPrice: campaignPrice ? Number(campaignPrice) : undefined,
       comparePrice: comparePrice ? Number(comparePrice) : undefined,
       whySections: whySections.filter((s) => s.heading || s.items.some(Boolean)),
       benefits: benefits.filter(Boolean),
       testimonials: testimonials.filter((t) => t.name || t.text),
+      customerReviews: customerReviews.filter((r) => r.name && r.videoUrl),
       included: included.filter(Boolean),
       features: features.filter((f) => f.title),
       ingredients: ingredients.filter((ig) => ig.name && ig.image),
-      faqs: faqs.filter((faq) => faq.question && faq.answer).map((faq, i) => ({ ...faq, sortOrder: i })),
+      faqs: faqs.filter((faq) => faq.question && faq.answer).map(({ question, answer }, i) => ({ question, answer, sortOrder: i })),
       theme,
+      labReportTitle: labReportTitle || undefined,
+      labReportDescription: labReportDescription || undefined,
+      labReportButtonText: labReportButtonText || undefined,
+      labReportButtonUrl: labReportButtonUrl || undefined,
+      labReportImages: labReportImages.filter(Boolean),
       offerBadge: offerBadge || undefined,
       ctaText: ctaText || undefined,
       phoneNumber: phoneNumber || undefined,
@@ -338,6 +379,23 @@ export default function CampaignForm({ initial, products, mode }: Props) {
           </div>
         </div>
       </section>
+
+      {/* ── Product Video ─────────────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Product Details Video</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="productVideoUrl">YouTube URL</Label>
+            <Input id="productVideoUrl" value={productVideoUrl} onChange={(e) => setProductVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="productVideoTitle">Video Title</Label>
+            <Input id="productVideoTitle" value={productVideoTitle} onChange={(e) => setProductVideoTitle(e.target.value)} placeholder="e.g. Product Demo Video" />
+          </div>
+        </div>
+      </section>
+
+      
 
       {/* ── Pricing ─────────────────────────────────────────────────── */}
       <section className="rounded border border-border bg-card p-5 space-y-4">
@@ -517,6 +575,84 @@ export default function CampaignForm({ initial, products, mode }: Props) {
         ))}
       </section>
 
+      {/* ── BTRI Lab Test Report ───────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">BTRI Lab Test Report</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Show the BTRI lab test report section on the campaign page (title, description, button + up to 3 report images).
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Report Section Title</Label>
+            <Input
+              value={labReportTitle}
+              onChange={(e) => setLabReportTitle(e.target.value)}
+              placeholder="BTRI Lab Test Report"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Button Text</Label>
+            <Input
+              value={labReportButtonText}
+              onChange={(e) => setLabReportButtonText(e.target.value)}
+              placeholder="সম্পূর্ণ রিপোর্ট দেখুন"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Description</Label>
+            <textarea
+              value={labReportDescription}
+              onChange={(e) => setLabReportDescription(e.target.value)}
+              placeholder="e.g. Dermoqore Spot Correcting Serum BTRI কর্তৃক পরীক্ষিত এবং নিরাপদ"
+              rows={2}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Button URL (link to full report)</Label>
+            <Input
+              value={labReportButtonUrl}
+              onChange={(e) => setLabReportButtonUrl(e.target.value)}
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+
+        {/* Report document images (up to 3) */}
+        <div className="space-y-2">
+          <Label>Report Images (up to 3)</Label>
+          <p className="text-xs text-muted-foreground">Upload document/certificate images that appear on the right side of the section.</p>
+          <div className="flex flex-wrap gap-3">
+            {labReportImages.map((url, i) => (
+              <div key={i} className="relative group">
+                <img src={url} alt={`Lab report ${i + 1}`} className="h-24 w-20 rounded border border-border object-cover shadow-sm" />
+                <button
+                  type="button"
+                  onClick={() => setLabReportImages((p) => p.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
+            ))}
+            {labReportImages.length < 3 && (
+              <label className="flex h-24 w-20 cursor-pointer flex-col items-center justify-center rounded border-2 border-dashed border-border bg-muted/30 text-muted-foreground hover:border-foreground/40 transition-colors">
+                {uploadingLabImage ? <Loader2Icon className="size-5 animate-spin" /> : <UploadIcon className="size-5" />}
+                <span className="mt-1 text-[10px] text-center px-1">Add Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => e.target.files?.[0] && handleLabImageUpload(e.target.files[0])}
+                />
+              </label>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* ── Why Sections ─────────────────────────────────────────────── */}
       <section className="rounded border border-border bg-card p-5 space-y-4">
         <div className="flex items-center justify-between">
@@ -627,6 +763,54 @@ export default function CampaignForm({ initial, products, mode }: Props) {
                 />
               </div>
               <Button type="button" variant="ghost" size="icon-xs" onClick={() => setTestimonials((p) => p.filter((_, idx) => idx !== i))}>
+                <TrashIcon className="size-3.5 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ── Customer Reviews ──────────────────────────────────────────── */}
+      <section className="rounded border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customer Reviews (Video)</h2>
+          <Button type="button" variant="outline" size="sm" onClick={addCustomerReview}>
+            <PlusIcon className="size-3.5" /> Add
+          </Button>
+        </div>
+        {customerReviews.map((r, i) => (
+          <div key={i} className="rounded border border-border p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="grid gap-3 sm:grid-cols-2 flex-1">
+                <Input
+                  value={r.name}
+                  onChange={(e) => updateCustomerReview(i, "name", e.target.value)}
+                  placeholder="Customer name"
+                />
+                <Input
+                  value={r.title ?? ""}
+                  onChange={(e) => updateCustomerReview(i, "title", e.target.value)}
+                  placeholder="Review title (optional)"
+                />
+                <Input
+                  value={r.videoTitle ?? ""}
+                  onChange={(e) => updateCustomerReview(i, "videoTitle", e.target.value)}
+                  placeholder="Video title (optional)"
+                />
+                <Input
+                  value={r.videoDescription ?? ""}
+                  onChange={(e) => updateCustomerReview(i, "videoDescription", e.target.value)}
+                  placeholder="Video description (optional)"
+                  className="sm:col-span-2"
+                />
+                <Input
+                  value={r.videoUrl}
+                  onChange={(e) => updateCustomerReview(i, "videoUrl", e.target.value)}
+                  placeholder="Video URL"
+                  className="sm:col-span-2"
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon-xs" onClick={() => removeCustomerReview(i)}>
                 <TrashIcon className="size-3.5 text-destructive" />
               </Button>
             </div>
