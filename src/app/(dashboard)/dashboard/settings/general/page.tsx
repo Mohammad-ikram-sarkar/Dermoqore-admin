@@ -1,8 +1,9 @@
-'use client'
-import { useEffect, useState } from "react";
+"use client"
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 interface CompanyInfo {
   id: string;
@@ -39,10 +40,37 @@ function CompanyInfoForm({ info, onUpdated }: CompanyInfoFormProps) {
     };
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = (key: keyof typeof values) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (key: keyof typeof values) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setValues((prev) => ({ ...prev, [key]: event.target.value }));
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !info?.id) return;
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/companyinfo/admin/upload-logo/${info.id}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Logo upload failed");
+      const data = (await res.json()) as CompanyInfo;
+      onUpdated(data);
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Failed to upload logo");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -70,11 +98,68 @@ function CompanyInfoForm({ info, onUpdated }: CompanyInfoFormProps) {
 
   return (
     <form className="grid gap-6" onSubmit={handleSubmit}>
+      {/* Logo + favicon */}
+      <div className="grid gap-2">
+        <label className="text-sm font-medium" htmlFor="logo">
+          Logo
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Upload your brand logo — it is also used as the storefront favicon.
+        </p>
+        <div className="flex items-center gap-4">
+          <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+            {info.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={info.logoUrl} alt="Brand logo" className="size-full object-contain" />
+            ) : (
+              <span className="text-xs text-muted-foreground">No logo</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={fileInputRef}
+              id="logo"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                "Upload Logo"
+              )}
+            </Button>
+            {info.logoUrl && (
+              <a
+                href={info.logoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted-foreground underline underline-offset-2"
+              >
+                View current
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-2">
         <label className="text-sm font-medium" htmlFor="name">
           Name
         </label>
         <Input id="name" value={values.name} onChange={handleChange("name")} />
+        <p className="text-xs text-muted-foreground">Site name shown across the storefront.</p>
       </div>
 
       <div className="grid gap-2">
@@ -142,7 +227,12 @@ export default function GeneralPage() {
     try {
       setIsCreating(true);
       setCreationError(null);
-      const { data } = await api.post<CompanyInfo>("/api/companyinfo/admin", emptyForm);
+      // Backend requires a non-empty `name` and a valid `email` (if provided),
+      // so seed the create payload with sane defaults the admin can edit after.
+      const { data } = await api.post<CompanyInfo>("/api/companyinfo/admin", {
+        name: "Dermoqore",
+        email: "admin@dermoqore.com",
+      });
       setInfo(data);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to create company info";
@@ -186,7 +276,7 @@ export default function GeneralPage() {
       </div>
 
       <section className="grid gap-6">
-        <CompanyInfoForm info={info} onUpdated={handleUpdated} />
+        <CompanyInfoForm key={info.id} info={info} onUpdated={handleUpdated} />
       </section>
     </div>
   );

@@ -116,6 +116,44 @@ function isGroupItem(item: NavItem): item is GroupItem {
   return "children" in item
 }
 
+// Controlled Collapsible so the "open" state doesn't change after mount
+// (which triggers the uncontrolled -> changing defaultOpen warning).
+function NavGroup({ item, pathname }: { item: GroupItem; pathname: string }) {
+  const isParentActive = item.children.some((c) => pathname.startsWith(c.url))
+  const [open, setOpen] = React.useState(isParentActive)
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="group/collapsible"
+      render={<SidebarMenuItem />}
+    >
+      <CollapsibleTrigger
+        render={<SidebarMenuButton tooltip={item.title} isActive={isParentActive} />}
+      >
+        <item.icon />
+        <span>{item.title}</span>
+        <ChevronRight className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <SidebarMenuSub>
+          {item.children.map((child) => (
+            <SidebarMenuSubItem key={child.title}>
+              <SidebarMenuSubButton
+                isActive={pathname === child.url}
+                render={<Link href={child.url} />}
+              >
+                <span>{child.title}</span>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          ))}
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -153,44 +191,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {section.items.map((item) => {
 
                 if (isGroupItem(item)) {
-                  const isParentActive = item.children.some((c) =>
-                    pathname.startsWith(c.url)
-                  )
-                  return (
-                    <Collapsible
-                      key={item.title}
-                      defaultOpen={isParentActive}
-                      className="group/collapsible"
-                      render={<SidebarMenuItem />}
-                    >
-                      <CollapsibleTrigger
-                        render={
-                          <SidebarMenuButton
-                            tooltip={item.title}
-                            isActive={isParentActive}
-                          />
-                        }
-                      >
-                        <item.icon />
-                        <span>{item.title}</span>
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.children.map((child) => (
-                            <SidebarMenuSubItem key={child.title}>
-                              <SidebarMenuSubButton
-                                isActive={pathname === child.url}
-                                render={<Link href={child.url} />}
-                              >
-                                <span>{child.title}</span>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  )
+                  return <NavGroup key={item.title} item={item} pathname={pathname} />
                 }
 
                 // Flat item
