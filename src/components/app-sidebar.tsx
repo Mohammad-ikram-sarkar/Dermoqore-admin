@@ -99,6 +99,7 @@ const navSections: { label: string; items: NavItem[] }[] = [
           { title: "General", url: "/dashboard/settings/general"  },
           { title: "Footer",  url: "/dashboard/settings/footer"   },
           { title: "Delivery", url: "/dashboard/settings/delivery" },
+          { title: "Password", url: "/dashboard/settings/password" },
         ],
       },
     ],
